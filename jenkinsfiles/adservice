@@ -2,11 +2,11 @@ pipeline {
     agent any 
 
     environment {
-        GIT_REPO_NAME = "Microservices-E-Commerce-eks-project"
+        // تم تعديل الاسم ليتطابق مع الرابط الحقيقي
+        GIT_REPO_NAME = "E-Commerce-Application-Microservice" 
         GIT_EMAIL = "ahmed.hessn1212@gmail.com"
-        GIT_USER_NAME = "AhmedEmad"
+        GIT_USER_NAME = "Ahmedhessn"
         IMAGE_NAME = "adservice"
-        // اتأكد إن الـ Account ID هنا هو اللي إنت شغال عليه فعلاً
         REPO_URL = "503459125797.dkr.ecr.us-east-1.amazonaws.com/adservice"
         YAML_FILE = "adservice.yaml"
     }
@@ -18,7 +18,7 @@ pipeline {
 
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/Ahmedhessn/E-Commerce-Application-Microservice.git'
+                git branch: 'main', url: "https://github.com/Ahmedhessn/${GIT_REPO_NAME}.git"
             }
         }
 
@@ -35,7 +35,6 @@ pipeline {
         stage("ECR Image Pushing") {
             steps {
                 script {
-                    // استخدمنا REPO_URL المتغير عشان ميبقاش فيه تعارض IDs
                     sh """
                     aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 503459125797.dkr.ecr.us-east-1.amazonaws.com
                     docker tag adservice:latest ${REPO_URL}:${BUILD_NUMBER}
@@ -48,6 +47,7 @@ pipeline {
         stage('Update Deployment file') {
             steps {
                 dir('kubernetes-files') {
+                    // استخدمنا Single Quotes (') مع الـ Variable عشان نحل تحذير الـ Security
                     withCredentials([string(credentialsId: 'my-git-pattoken', variable: 'git_token')]) {
                         sh """
                             git config user.email "${GIT_EMAIL}"
@@ -57,9 +57,9 @@ pipeline {
                             
                             git add ${YAML_FILE}
                             
-                            # تعديل البرانش لـ main بدل master
                             if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
-                                git push https://${git_token}@github.com/Ahmedhessn/${GIT_REPO_NAME} HEAD:main
+                                # تم تصحيح الرابط والبرانش هنا
+                                git push https://\${git_token}@github.com/Ahmedhessn/${GIT_REPO_NAME}.git HEAD:main
                             else
                                 echo "No changes to commit"
                             fi
