@@ -1,61 +1,72 @@
 pipeline {
     agent any 
 
+    environment {
+        // --- الأساسيات اللي هتغيرها في كل ملف جديد ---
+        IMAGE_NAME    = "cartservice"
+        YAML_FILE     = "cartservice.yaml"
+        DOCKER_DIR    = "src/cartservice/src" // المسار اللي فيه الـ Dockerfile
+        
+        // --- بيانات ثابتة لكل المشروع ---
+        GIT_REPO_NAME = "E-Commerce-Application-Microservice"
+        GIT_USER_NAME = "Ahmedhessn"
+        GIT_EMAIL     = "ahmed.hessn1212@gmail.com"
+        REPO_URL      = "503459125797.dkr.ecr.us-east-1.amazonaws.com/${IMAGE_NAME}"
+    }
+
     stages {
         stage('Cleaning Workspace') {
-            steps {
-                cleanWs()
-            }
+            steps { cleanWs() }
         }
+
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/Ahmedhessn/E-Commerce-Application-Microservice.git'
+                git branch: 'main', url: "https://github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git"
             }
         }
+
         stage("Docker Image Build") {
             steps {
                 script {
-                    dir('src/cartservice/src') {
-                        sh 'docker build -t cartservice .'
+                    dir("${DOCKER_DIR}") {
+                        sh "docker build -t ${IMAGE_NAME} ."
                     }
                 }
             }
         }
+
         stage("ECR Image Pushing") {
             steps {
                 script {
-                    sh '''
+                    sh """
                     aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 503459125797.dkr.ecr.us-east-1.amazonaws.com
-                    docker tag cartservice:latest 503459125797.dkr.ecr.us-east-1.amazonaws.com/cartservice:${BUILD_NUMBER}
-                    docker push 503459125797.dkr.ecr.us-east-1.amazonaws.com/cartservice:${BUILD_NUMBER}
-                    '''
+                    docker tag ${IMAGE_NAME}:latest ${REPO_URL}:${BUILD_NUMBER}
+                    docker push ${REPO_URL}:${BUILD_NUMBER}
+                    """
                 }
             }
         }
+
         stage('Update Deployment file') {
-            environment {
-                GIT_REPO_NAME = "E-Commerce-Application-Microservice"
-                GIT_EMAIL = "ahmed.hessn1212@gmail.com"
-                GIT_USER_NAME = "Ahmedhessn"
-                IMAGE_NAME = "cartservice"
-                REPO_URL = "503459125797.dkr.ecr.us-east-1.amazonaws.com/cartservice"
-                YAML_FILE = "cartservice.yaml"
-            }
             steps {
                 dir('kubernetes-files') {
-                    withCredentials([string(credentialsId: 'my-git-pattoken', variable: 'git_token')]) {
+                    // الطريقة اللي ريحتك (Username/Password)
+                    withCredentials([usernamePassword(credentialsId: 'my-git-pattoken', 
+                                                     usernameVariable: 'GIT_USER', 
+                                                     passwordVariable: 'GIT_PASS')]) {
                         sh """
                             git config user.email "${GIT_EMAIL}"
                             git config user.name "${GIT_USER_NAME}"
-                            
+
+                            # تحديث الصورة في ملف الـ yaml
                             sed -i "s#image:.*#image: ${REPO_URL}:${BUILD_NUMBER}#g" ${YAML_FILE}
+
+                            git add ${YAML_FILE}
                             
-                            git add .
-                            
-                            # الـ if دي بتحميك لو مفيش تغييرات حقيقية في الملف
+                            # تنفيذ الـ commit والـ push
                             if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
-                                # السلاش قبل git_token دي عشان الـ Security
-                                git push https://\${git_token}@github.com/Ahmedhessn/${GIT_REPO_NAME}.git HEAD:main
+                                git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
+                                git push origin main
                             else
                                 echo "No changes to commit"
                             fi
