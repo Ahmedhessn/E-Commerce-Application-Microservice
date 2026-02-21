@@ -2,69 +2,66 @@ pipeline {
     agent any 
 
     environment {
-        // تم تعديل الاسم ليتطابق مع الرابط الحقيقي
-        GIT_REPO_NAME = "E-Commerce-Application-Microservice" 
+        GIT_REPO_NAME = "E-Commerce-Application-Microservice"
         GIT_EMAIL = "ahmed.hessn1212@gmail.com"
         GIT_USER_NAME = "Ahmedhessn"
         IMAGE_NAME = "adservice"
         REPO_URL = "503459125797.dkr.ecr.us-east-1.amazonaws.com/adservice"
         YAML_FILE = "adservice.yaml"
+        GIT_URL = "https://github.com/Ahmedhessn/E-Commerce-Application-Microservice.git"
     }
 
     stages {
+
         stage('Cleaning Workspace') {
             steps { cleanWs() }
         }
 
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: "https://github.com/Ahmedhessn/${GIT_REPO_NAME}.git"
+                git branch: 'main',
+                    url: "${GIT_URL}",
+                    credentialsId: 'my-git-pattoken'
             }
         }
 
         stage("Docker Image Build") {
             steps {
-                script {
-                    dir('src/adservice') {
-                        sh 'docker build -t adservice .'
-                    }
+                dir('src/adservice') {
+                    sh 'docker build -t adservice .'
                 }
             }
         }
 
         stage("ECR Image Pushing") {
             steps {
-                script {
-                    sh """
-                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 503459125797.dkr.ecr.us-east-1.amazonaws.com
-                    docker tag adservice:latest ${REPO_URL}:${BUILD_NUMBER}
-                    docker push ${REPO_URL}:${BUILD_NUMBER}
-                    """
-                }
+                sh """
+                aws ecr get-login-password --region us-east-1 | \
+                docker login --username AWS --password-stdin 503459125797.dkr.ecr.us-east-1.amazonaws.com
+
+                docker tag adservice:latest ${REPO_URL}:${BUILD_NUMBER}
+                docker push ${REPO_URL}:${BUILD_NUMBER}
+                """
             }
         }
 
         stage('Update Deployment file') {
             steps {
                 dir('kubernetes-files') {
-                    // استخدمنا Single Quotes (') مع الـ Variable عشان نحل تحذير الـ Security
-                    withCredentials([string(credentialsId: 'my-git-pattoken', variable: 'git_token')]) {
-                        sh """
-                            git config user.email "${GIT_EMAIL}"
-                            git config user.name "${GIT_USER_NAME}"
-                            
-                            sed -i "s#image:.*#image: ${REPO_URL}:${BUILD_NUMBER}#g" ${YAML_FILE}
-                            
-                            git add ${YAML_FILE}
-                            
-                            if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
-                                # تم تصحيح الرابط والبرانش هنا
-                                git push https://\${git_token}@github.com/Ahmedhessn/${GIT_REPO_NAME}.git HEAD:main
-                            else
-                                echo "No changes to commit"
-                            fi
-                        """
-                    }
+                    sh """
+                        git config user.email "${GIT_EMAIL}"
+                        git config user.name "${GIT_USER_NAME}"
+
+                        sed -i "s#image:.*#image: ${REPO_URL}:${BUILD_NUMBER}#g" ${YAML_FILE}
+
+                        git add ${YAML_FILE}
+
+                        if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
+                            git push origin main
+                        else
+                            echo "No changes to commit"
+                        fi
+                    """
                 }
             }
         }
