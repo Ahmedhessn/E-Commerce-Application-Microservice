@@ -1,69 +1,74 @@
 pipeline {
     agent any 
 
+    environment {
+        // البيانات الخاصة بالخدمة
+        IMAGE_NAME    = "frontend"
+        YAML_FILE     = "frontend.yaml"
+        DOCKER_DIR    = "src/frontend"
+        
+        // البيانات الثابتة
+        AWS_ACCOUNT_ID = "503459125797"
+        GIT_REPO_NAME  = "E-Commerce-Application-Microservice"
+        GIT_USER_NAME  = "Ahmedhessn"
+        GIT_EMAIL      = "ahmed.hessn1212@gmail.com"
+        REPO_URL       = "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${IMAGE_NAME}"
+    }
+
     stages {
         stage('Cleaning Workspace') {
-            steps {
-                cleanWs()
-            }
+            steps { cleanWs() }
         }
+
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/Ahmedhessn/E-Commerce-Application-Microservice.git'
+                git branch: 'main', url: "https://github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git"
             }
         }
+
         stage("Docker Image Build") {
             steps {
                 script {
-                    dir('src/frontend') {
-                        sh 'docker system prune -f'
-                        sh 'docker container prune -f'
-                        sh 'docker build -t frontend .'
+                    dir("${DOCKER_DIR}") {
+                        sh "docker build -t ${IMAGE_NAME} ."
                     }
                 }
             }
         }
+
         stage("ECR Image Pushing") {
             steps {
                 script {
-                    sh '''
-                    #Retrieve an authentication token and authenticate your Docker client to your registry. Use the AWS CLI:
-                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 503459125797.dkr.ecr.us-east-1.amazonaws.com
-
-                    #After the build completes, tag your image so you can push the image to this repository:
-                    docker tag frontend:latest 503459125797.dkr.ecr.us-east-1.amazonaws.com/frontend:${BUILD_NUMBER}
-
-                    #Run the following command to push this image to your newly created AWS repository:
-                    docker push 503459125797.dkr.ecr.us-east-1.amazonaws.com/frontend:${BUILD_NUMBER}
-                    '''
+                    sh """
+                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+                    docker tag ${IMAGE_NAME}:latest ${REPO_URL}:${BUILD_NUMBER}
+                    docker push ${REPO_URL}:${BUILD_NUMBER}
+                    """
                 }
             }
         }
+
         stage('Update Deployment file') {
-            environment {
-                GIT_REPO_NAME = "E-Commerce-Application-Microservice"
-                GIT_EMAIL = "ahmed.hessn1212@gmail.com"
-                GIT_USER_NAME = "Ahmedhessn"
-                IMAGE_NAME = "frontend"
-                REPO_URL = "503459125797.dkr.ecr.us-east-1.amazonaws.com/frontend"
-                YAML_FILE = "frontend.yaml"
-            }
             steps {
                 dir('kubernetes-files') {
-                    withCredentials([string(credentialsId: 'my-git-pattoken', variable: 'git_token')]) {
-                        sh '''
+                    withCredentials([usernamePassword(credentialsId: 'my-git-pattoken', 
+                                                     usernameVariable: 'GIT_USER', 
+                                                     passwordVariable: 'GIT_PASS')]) {
+                        sh """
                             git config user.email "${GIT_EMAIL}"
                             git config user.name "${GIT_USER_NAME}"
-                            BUILD_NUMBER=${BUILD_NUMBER}
-                            echo $BUILD_NUMBER
 
-                            # push this image to your git hub
-                            sed -i "s#image:.*#image: ${REPO_URL}:$BUILD_NUMBER#g" ${YAML_FILE}
-                            git add .
-                            git commit -m "Update ${IMAGE_NAME} Image to version \${BUILD_NUMBER}"
-                            git push https://${git_token}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
-        
-                        '''
+                            sed -i "s#image:.*#image: ${REPO_URL}:${BUILD_NUMBER}#g" ${YAML_FILE}
+
+                            git add ${YAML_FILE}
+                            
+                            if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
+                                git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
+                                git push origin main
+                            else
+                                echo "No changes to commit"
+                            fi
+                        """
                     }
                 }
             }
