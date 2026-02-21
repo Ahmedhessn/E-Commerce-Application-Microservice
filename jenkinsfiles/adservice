@@ -51,21 +51,21 @@ pipeline {
     steps {
         dir('kubernetes-files') {
             withCredentials([usernamePassword(credentialsId: 'my-git-pattoken', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                sh '''
+                sh """
                     git config user.email "ahmed.hessn1212@gmail.com"
                     git config user.name "Ahmedhessn"
 
-                    sed -i "s#image:.*#image: 503459125797.dkr.ecr.us-east-1.amazonaws.com/adservice:${BUILD_NUMBER}#g" adservice.yaml
+                    sed -i 's#image:.*#image: 503459125797.dkr.ecr.us-east-1.amazonaws.com/adservice:${BUILD_NUMBER}#g' adservice.yaml
 
                     git add adservice.yaml
                     git commit -m "Update adservice Image to version ${BUILD_NUMBER}" || echo "No changes to commit"
 
                     git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/Ahmedhessn/E-Commerce-Application-Microservice.git
                     git push origin main
-                '''
+                """
+                }
             }
         }
     }
-    } 
     }
 }
