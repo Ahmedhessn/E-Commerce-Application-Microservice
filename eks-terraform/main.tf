@@ -176,9 +176,13 @@ resource "aws_eks_node_group" "node-grp" {
   node_group_name = var.node_group_name
   node_role_arn   = aws_iam_role.worker.arn
   subnet_ids      = [data.aws_subnet.subnet-1.id, data.aws_subnet.subnet-2.id]
-  capacity_type   = "ON_DEMAND"
+  
+  # التعديل: تحويل لنظام SPOT لتوفير التكلفة
+  capacity_type   = "SPOT"
   disk_size       = 20
-  instance_types  = ["t2.large"]
+  
+  # التعديل: استخدام t3.medium أرخص وأنسب للمشروع
+  instance_types  = ["t3.medium"]
 
   labels = {
     env = "dev"
@@ -188,10 +192,11 @@ resource "aws_eks_node_group" "node-grp" {
     Name = "project-eks-node-group"
   }
 
+  # التعديل: تقليل العدد لـ 2 نودز لضمان استقرار الميكروسيرفس
   scaling_config {
-    desired_size = 3
-    max_size     = 10
-    min_size     = 2
+    desired_size = 2
+    max_size     = 5
+    min_size     = 1
   }
 
   update_config {
