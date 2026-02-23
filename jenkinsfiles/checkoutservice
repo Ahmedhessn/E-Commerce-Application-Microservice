@@ -5,13 +5,15 @@ pipeline {
         // --- الأساسيات اللي هتغيرها في كل ملف جديد ---
         IMAGE_NAME    = "checkoutservice"
         YAML_FILE     = "checkoutservice.yaml"
-        DOCKER_DIR    = "src/checkoutservice/src" // المسار اللي فيه الـ Dockerfile
+        // التعديل هنا: المسار الصحيح للخدمة
+        DOCKER_DIR    = "src/checkoutservice" 
         
         // --- بيانات ثابتة لكل المشروع ---
-        GIT_REPO_NAME = "E-Commerce-Application-Microservice"
-        GIT_USER_NAME = "Ahmedhessn"
-        GIT_EMAIL     = "ahmed.hessn1212@gmail.com"
-        REPO_URL      = "503459125797.dkr.ecr.us-east-1.amazonaws.com/${IMAGE_NAME}"
+        AWS_ACCOUNT_ID = "503459125797"
+        GIT_REPO_NAME  = "E-Commerce-Application-Microservice"
+        GIT_USER_NAME  = "Ahmedhessn"
+        GIT_EMAIL      = "ahmed.hessn1212@gmail.com"
+        REPO_URL       = "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${IMAGE_NAME}"
     }
 
     stages {
@@ -29,6 +31,7 @@ pipeline {
             steps {
                 script {
                     dir("${DOCKER_DIR}") {
+                        // بناء الصورة باستخدام المسار الجديد
                         sh "docker build -t ${IMAGE_NAME} ."
                     }
                 }
@@ -39,7 +42,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 503459125797.dkr.ecr.us-east-1.amazonaws.com
+                    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
                     docker tag ${IMAGE_NAME}:latest ${REPO_URL}:${BUILD_NUMBER}
                     docker push ${REPO_URL}:${BUILD_NUMBER}
                     """
@@ -50,7 +53,6 @@ pipeline {
         stage('Update Deployment file') {
             steps {
                 dir('kubernetes-files') {
-                    // الطريقة اللي ريحتك (Username/Password)
                     withCredentials([usernamePassword(credentialsId: 'my-git-pattoken', 
                                                      usernameVariable: 'GIT_USER', 
                                                      passwordVariable: 'GIT_PASS')]) {
@@ -58,12 +60,11 @@ pipeline {
                             git config user.email "${GIT_EMAIL}"
                             git config user.name "${GIT_USER_NAME}"
 
-                            # تحديث الصورة في ملف الـ yaml
+                            # تحديث الصورة بالـ Build Number الجديد
                             sed -i "s#image:.*#image: ${REPO_URL}:${BUILD_NUMBER}#g" ${YAML_FILE}
 
                             git add ${YAML_FILE}
                             
-                            # تنفيذ الـ commit والـ push
                             if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
                                 git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
                                 git push origin main
