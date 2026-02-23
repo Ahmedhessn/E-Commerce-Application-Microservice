@@ -31,8 +31,8 @@ pipeline {
         stage("Docker Image Build") {
             steps {
                 script {
-                    // هنا كان الخطأ، دخلنا فولدر src زيادة
-                    dir("${DOCKER_CONTEXT}") {
+                    // المسار الصحيح بناءً على الصورة هو src/checkoutservice فقط
+                    dir("src/checkoutservice") {
                         sh "docker build -t ${IMAGE_NAME} ."
                     }
                 }
