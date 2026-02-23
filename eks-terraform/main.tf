@@ -183,7 +183,6 @@ resource "aws_eks_node_group" "node-grp" {
   
   # التعديل: استخدام t3.medium أرخص وأنسب للمشروع
   instance_types  = ["t3.medium"]
-
   labels = {
     env = "dev"
   }

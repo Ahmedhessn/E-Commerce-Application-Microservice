@@ -6,9 +6,9 @@ pipeline {
         GIT_REPO_NAME = "E-Commerce-Application-Microservice"
         GIT_EMAIL     = "ahmed.hessn1212@gmail.com"
         GIT_USER_NAME  = "Ahmedhessn"
-        IMAGE_NAME    = "adservice" 
-        REPO_URL      = "503459125797.dkr.ecr.us-east-1.amazonaws.com/adservice"
-        YAML_FILE     = "adservice.yaml"
+        IMAGE_NAME    = "cartservice" 
+        REPO_URL      = "503459125797.dkr.ecr.us-east-1.amazonaws.com/cartservice"
+        YAML_FILE     = "cartservice.yaml"
     }
 
     stages {

@@ -3,9 +3,9 @@ pipeline {
 
     environment {
         // --- الأساسيات اللي هتغيرها في كل ملف جديد ---
-        IMAGE_NAME    = "cartservice"
-        YAML_FILE     = "cartservice.yaml"
-        DOCKER_DIR    = "src/cartservice/src" // المسار اللي فيه الـ Dockerfile
+        IMAGE_NAME    = "checkoutservice"
+        YAML_FILE     = "checkoutservice.yaml"
+        DOCKER_DIR    = "src/checkoutservice/src" // المسار اللي فيه الـ Dockerfile
         
         // --- بيانات ثابتة لكل المشروع ---
         GIT_REPO_NAME = "E-Commerce-Application-Microservice"
