@@ -39,7 +39,7 @@ stage("Docker Image Build") {
                 }
             }
         }
-        }
+        
 
         stage("ECR Image Pushing") {
             steps {
