@@ -2,19 +2,14 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# ----------------------------
-# IAM Role for EKS Cluster
-# ----------------------------
+# 1. IAM Role for EKS Cluster
 resource "aws_iam_role" "master" {
   name = "yaswanth-eks-master1"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = {
-        Service = "eks.amazonaws.com"
-      },
+      Principal = { Service = "eks.amazonaws.com" },
       Action = "sts:AssumeRole"
     }]
   })
@@ -35,19 +30,14 @@ resource "aws_iam_role_policy_attachment" "AmazonEKSVPCResourceController" {
   role       = aws_iam_role.master.name
 }
 
-# ----------------------------
-# IAM Role for Worker Nodes
-# ----------------------------
+# 2. IAM Role for Worker Nodes
 resource "aws_iam_role" "worker" {
   name = "yaswanth-eks-worker1"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      },
+      Principal = { Service = "ec2.amazonaws.com" },
       Action = "sts:AssumeRole"
     }]
   })
@@ -104,47 +94,31 @@ resource "aws_iam_role_policy_attachment" "autoscaler" {
 }
 
 resource "aws_iam_instance_profile" "worker" {
-  depends_on = [aws_iam_role.worker]
-  name       = "yaswanth-eks-worker-profile1"
-  role       = aws_iam_role.worker.name
+  name = "yaswanth-eks-worker-profile1"
+  role = aws_iam_role.worker.name
 }
 
-# ----------------------------
-# VPC and Subnet Data Sources
-# ----------------------------
+# 3. VPC and Subnet Data Sources
 data "aws_vpc" "main" {
-  tags = {
-    Name = "Jumphost-vpc"
-  }
+  tags = { Name = "Jumphost-vpc" }
 }
 
 data "aws_subnet" "subnet-1" {
   vpc_id = data.aws_vpc.main.id
-  filter {
-    name   = "tag:Name"
-    values = ["Public-Subnet-1"]
-  }
+  filter { name = "tag:Name", values = ["Public-Subnet-1"] }
 }
 
 data "aws_subnet" "subnet-2" {
   vpc_id = data.aws_vpc.main.id
-  filter {
-    name   = "tag:Name"
-    values = ["Public-subnet2"]
-  }
+  filter { name = "tag:Name", values = ["Public-subnet2"] }
 }
 
 data "aws_security_group" "selected" {
   vpc_id = data.aws_vpc.main.id
-  filter {
-    name   = "tag:Name"
-    values = ["Jumphost-sg"]
-  }
+  filter { name = "tag:Name", values = ["Jumphost-sg"] }
 }
 
-# ----------------------------
-# EKS Cluster
-# ----------------------------
+# 4. EKS Cluster (تمت إضافة access_config هنا)
 resource "aws_eks_cluster" "eks" {
   name     = "project-eks"
   role_arn = aws_iam_role.master.arn
@@ -154,10 +128,9 @@ resource "aws_eks_cluster" "eks" {
     security_group_ids = [data.aws_security_group.selected.id]
   }
 
-  tags = {
-    Name        = "yaswanth-eks-cluster"
-    Environment = "dev"
-    Terraform   = "true"
+  # السطر ده هو اللي هيسمح للـ API بالعمل
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
   }
 
   depends_on = [
@@ -167,31 +140,17 @@ resource "aws_eks_cluster" "eks" {
   ]
 }
 
-
-# ----------------------------
-# EKS Node Group
-# ----------------------------
+# 5. EKS Node Group
 resource "aws_eks_node_group" "node-grp" {
   cluster_name    = aws_eks_cluster.eks.name
-  node_group_name = var.node_group_name
+  node_group_name = "project-node-group"
   node_role_arn   = aws_iam_role.worker.arn
   subnet_ids      = [data.aws_subnet.subnet-1.id, data.aws_subnet.subnet-2.id]
   
-  # التعديل: تحويل لنظام SPOT لتوفير التكلفة
   capacity_type   = "SPOT"
   disk_size       = 20
-  
-  # التعديل: استخدام t3.medium أرخص وأنسب للمشروع
   instance_types  = ["t3.medium"]
-  labels = {
-    env = "dev"
-  }
 
-  tags = {
-    Name = "project-eks-node-group"
-  }
-
-  # التعديل: تقليل العدد لـ 2 نودز لضمان استقرار الميكروسيرفس
   scaling_config {
     desired_size = 2
     max_size     = 5
@@ -211,9 +170,7 @@ resource "aws_eks_node_group" "node-grp" {
   ]
 }
 
-# ----------------------------
-# OIDC Provider for ServiceAccount IAM Roles
-# ----------------------------
+# 6. OIDC Provider
 data "aws_eks_cluster" "eks_oidc" {
   name = aws_eks_cluster.eks.name
 }
@@ -226,4 +183,21 @@ resource "aws_iam_openid_connect_provider" "eks_oidc" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.oidc_thumbprint.certificates[0].sha1_fingerprint]
   url             = data.aws_eks_cluster.eks_oidc.identity[0].oidc[0].issuer
+}
+
+# 7. حل مشكلة الـ Unauthorized (إضافة صلاحيات الجامب هوست)
+resource "aws_eks_access_entry" "jumphost_access" {
+  cluster_name      = aws_eks_cluster.eks.name
+  principal_arn     = "arn:aws:iam::503459125797:role/Jumphost-iam-role1"
+  type              = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "jumphost_admin_policy" {
+  cluster_name  = aws_eks_cluster.eks.name
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  principal_arn = "arn:aws:iam::503459125797:role/Jumphost-iam-role1"
+
+  access_scope {
+    type = "cluster"
+  }
 }
