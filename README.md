@@ -15,10 +15,10 @@ This guide walks through the complete setup — from cloning the repository to e
 # Step 1: Clone the GitHub Repository
 
 Repository:
-`https://github.com/arumullayaswanth/Microservices-E-Commerce-eks-project.git`
+`https://github.com/Ahmedhessn/E-Commerce-Application-Microservice`
 
 ```bash
-git clone https://github.com/arumullayaswanth/Microservices-E-Commerce-eks-project.git
+git clone https:https://github.com/Ahmedhessn/E-Commerce-Application-Microservice
 cd Microservices-E-Commerce-eks-project
 ```
 
