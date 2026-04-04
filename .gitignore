@@ -17,5 +17,8 @@ pkg/
 .terraform/*
 .terraform.lock.hcl
 *.tfvars
+# Never commit private keys
+*.pem
+**/jumphost-key.pem
 release/wi-kubernetes-manifests.yaml
 *.github

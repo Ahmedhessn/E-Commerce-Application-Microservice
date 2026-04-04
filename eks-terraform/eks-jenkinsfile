@@ -1,18 +1,25 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        // EKS control plane + node group often need 20–45+ minutes; avoid Jenkins aborting early
+        timeout(time: 90, unit: 'MINUTES')
+    }
+
     parameters {
         choice(
             name: 'ACTION',
             choices: ['apply', 'destroy'],
-            description: '🔧 Select the Terraform action to perform'
+            description: 'Select the Terraform action to perform'
         )
     }
 
     stages {
         stage('Checkout from Git') {
             steps {
-                echo 'Checking out Git repository...'
+                // Required if job uses Pipeline script from SCM; re-pulls latest eks-terraform/
+                checkout scm
             }
         }
 
@@ -25,7 +32,7 @@ pipeline {
         stage('Terraform init') {
             steps {
                 dir('eks-terraform') {
-                    sh 'terraform init --reconfigure'
+                    sh 'terraform init --reconfigure -no-color'
                 }
             }
         }
@@ -33,7 +40,7 @@ pipeline {
         stage('Terraform validate') {
             steps {
                 dir('eks-terraform') {
-                    sh 'terraform validate'
+                    sh 'terraform validate -no-color'
                 }
             }
         }
@@ -41,7 +48,7 @@ pipeline {
         stage('Terraform plan') {
             steps {
                 dir('eks-terraform') {
-                    sh 'terraform plan'
+                    sh 'terraform plan -no-color -out=tfplan'
                 }
             }
         }
@@ -52,7 +59,9 @@ pipeline {
             }
             steps {
                 dir('eks-terraform') {
-                    sh 'terraform apply -auto-approve'
+                    echo 'EKS: control plane usually ~15–25 min; node group ~5–15 min. Log may look idle — this is normal.'
+                    // Stream output; tee keeps console visible in some Jenkins setups
+                    sh 'terraform apply -no-color -auto-approve -input=false tfplan 2>&1 | tee terraform-apply.log'
                 }
             }
         }
@@ -63,7 +72,7 @@ pipeline {
             }
             steps {
                 dir('eks-terraform') {
-                    sh 'terraform destroy -auto-approve'
+                    sh 'terraform destroy -no-color -auto-approve -input=false'
                 }
             }
         }
