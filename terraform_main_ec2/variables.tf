@@ -73,9 +73,15 @@ variable "ami_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type (t3.small saves cost for learning; use t3.medium if Jenkins/builds are slow)"
+  description = "EC2 instance type for the jumphost (t3.medium is a sensible default; use t3.small only if cost is tight)"
   type        = string
-  default     = "t3.small"
+  default     = "t3.medium"
+}
+
+variable "jumphost_use_spot" {
+  description = "If true, launch as Spot for lower hourly cost. AWS may reclaim capacity (instance stops); not ideal if you need 24/7 SSH. For lowest cost when nobody needs the box: stop the instance in the console/CLI instead of relying on Spot."
+  type        = bool
+  default     = false
 }
 
 variable "key_name" {
