@@ -23,9 +23,13 @@ resource "aws_subnet" "public-subnet1" {
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
 
-  tags = {
-    Name = var.subnet-name1
-  }
+  tags = merge(
+    { Name = var.subnet-name1 },
+    {
+      "kubernetes.io/role/elb"                        = "1"
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
+    }
+  )
 }
 resource "aws_subnet" "public-subnet2" {
   vpc_id                  = aws_vpc.vpc.id
@@ -33,9 +37,13 @@ resource "aws_subnet" "public-subnet2" {
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
 
-  tags = {
-    Name = var.subnet-name2
-  }
+  tags = merge(
+    { Name = var.subnet-name2 },
+    {
+      "kubernetes.io/role/elb"                        = "1"
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
+    }
+  )
 }
 
 resource "aws_subnet" "private-subnet1" {
@@ -44,9 +52,13 @@ resource "aws_subnet" "private-subnet1" {
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = false
 
-  tags = {
-    Name = var.private_subnet_name1
-  }
+  tags = merge(
+    { Name = var.private_subnet_name1 },
+    {
+      "kubernetes.io/role/internal-elb"               = "1"
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
+    }
+  )
 }
 
 resource "aws_subnet" "private-subnet2" {
@@ -55,9 +67,13 @@ resource "aws_subnet" "private-subnet2" {
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = false
 
-  tags = {
-    Name = var.private_subnet_name2
-  }
+  tags = merge(
+    { Name = var.private_subnet_name2 },
+    {
+      "kubernetes.io/role/internal-elb"               = "1"
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
+    }
+  )
 }
 
 
@@ -99,6 +115,31 @@ resource "aws_route_table_association" "private_rt_association1" {
 resource "aws_route_table_association" "private_rt_association2" {
   route_table_id = aws_route_table.private_rt.id
   subnet_id      = aws_subnet.private-subnet2.id
+}
+
+# Single NAT in us-east-1a to save cost (~hourly NAT + EIP). Private subnets in both AZs use this route.
+# To reduce bill later: terraform destroy these three resources (route, nat_gateway, eip) and point EKS back to public subnets.
+resource "aws_eip" "nat" {
+  domain     = "vpc"
+  depends_on = [aws_internet_gateway.igw]
+  tags = {
+    Name = "Jumphost-nat-eip"
+  }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public-subnet1.id
+  depends_on    = [aws_internet_gateway.igw]
+  tags = {
+    Name = "Jumphost-nat-gateway"
+  }
+}
+
+resource "aws_route" "private_to_internet_via_nat" {
+  route_table_id         = aws_route_table.private_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.main.id
 }
 
 resource "aws_security_group" "security-group" {

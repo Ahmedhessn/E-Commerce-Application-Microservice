@@ -103,14 +103,15 @@ data "aws_vpc" "main" {
   tags = { Name = "Jumphost-vpc" }
 }
 
+# Worker nodes + cluster ENIs in private subnets; outbound internet via NAT Gateway (terraform_main_ec2/vpc.tf).
 data "aws_subnet" "subnet-1" {
   vpc_id = data.aws_vpc.main.id
-  filter { name = "tag:Name", values = ["Public-Subnet-1"] }
+  filter { name = "tag:Name", values = ["Private-subnet1"] }
 }
 
 data "aws_subnet" "subnet-2" {
   vpc_id = data.aws_vpc.main.id
-  filter { name = "tag:Name", values = ["Public-subnet2"] }
+  filter { name = "tag:Name", values = ["Private-subnet2"] }
 }
 
 data "aws_security_group" "selected" {
@@ -149,11 +150,12 @@ resource "aws_eks_node_group" "node-grp" {
   
   capacity_type   = "SPOT"
   disk_size       = 20
-  instance_types  = ["t3.medium"]
+  # Cheapest that usually works for learning; t3.medium as fallback if Spot has no small capacity
+  instance_types  = ["t3.small", "t3.medium"]
 
   scaling_config {
-    desired_size = 2
-    max_size     = 5
+    desired_size = 1
+    max_size     = 2
     min_size     = 1
   }
 

@@ -24,7 +24,7 @@ resource "aws_ecr_repository" "services" {
   name = each.value
 
   image_scanning_configuration {
-    scan_on_push = true
+    scan_on_push = false
   }
 
   encryption_configuration {

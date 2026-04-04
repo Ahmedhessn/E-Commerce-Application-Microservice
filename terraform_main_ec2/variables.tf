@@ -54,6 +54,11 @@ variable "sg-name" {
   default = "Jumphost-sg"
 }
 
+variable "eks_cluster_name" {
+  description = "EKS cluster name for kubernetes.io/cluster/* subnet tags (must match eks-terraform cluster name)"
+  type        = string
+  default     = "project-eks"
+}
 
 variable "iam-role" {
   description = "IAM Role for the Jumphost Server"
@@ -68,9 +73,9 @@ variable "ami_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "EC2 instance type (t3.small saves cost for learning; use t3.medium if Jenkins/builds are slow)"
   type        = string
-  default     = "t3.medium" # بدلاً من t2.large
+  default     = "t3.small"
 }
 
 variable "key_name" {
