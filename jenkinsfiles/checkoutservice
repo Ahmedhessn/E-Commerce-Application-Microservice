@@ -14,6 +14,7 @@ pipeline {
         GIT_USER_NAME  = "Ahmedhessn"
         GIT_EMAIL      = "ahmed.hessn1212@gmail.com"
         REPO_URL       = "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${IMAGE_NAME}"
+        K8S_REPO       = "https://github.com/Ahmedhessn/K8s-CD-files.git"
     }
 
     stages {
@@ -52,27 +53,39 @@ pipeline {
 
         stage('Update Deployment file') {
             steps {
-                dir('kubernetes-files') {
-                    withCredentials([usernamePassword(credentialsId: 'my-git-pattoken', 
-                                                     usernameVariable: 'GIT_USER', 
-                                                     passwordVariable: 'GIT_PASS')]) {
-                        sh """
-                            git config user.email "${GIT_EMAIL}"
-                            git config user.name "${GIT_USER_NAME}"
+                withCredentials([usernamePassword(credentialsId: 'my-git-pattoken',
+                                                 usernameVariable: 'GIT_USER',
+                                                 passwordVariable: 'GIT_PASS')]) {
+                    sh '''
+                        set -e
 
-                            # تحديث الصورة بالـ Build Number الجديد
-                            sed -i "s#image:.*#image: ${REPO_URL}:${BUILD_NUMBER}#g" ${YAML_FILE}
+                        ASKPASS_PATH="$WORKSPACE/.git-askpass.sh"
+                        cat > "$ASKPASS_PATH" <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) echo "$GIT_USER" ;;
+  *Password*) echo "$GIT_PASS" ;;
+  *) echo ;;
+esac
+EOF
+                        chmod 700 "$ASKPASS_PATH"
 
-                            git add ${YAML_FILE}
-                            
-                            if git commit -m "Update ${IMAGE_NAME} Image to version ${BUILD_NUMBER}"; then
-                                git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
-                                git push origin main
-                            else
-                                echo "No changes to commit"
-                            fi
-                        """
-                    }
+                        rm -rf k8s-cd
+                        GIT_ASKPASS="$ASKPASS_PATH" GIT_TERMINAL_PROMPT=0 git clone "$K8S_REPO" k8s-cd
+                        test -d k8s-cd/kubernetes-files
+                        cd k8s-cd/kubernetes-files
+
+                        git config user.email "$GIT_EMAIL"
+                        git config user.name "$GIT_USER_NAME"
+
+                        sed -i "s#image:.*#image: $REPO_URL:$BUILD_NUMBER#g" "$YAML_FILE"
+
+                        git add "$YAML_FILE"
+                        git commit -m "Update $IMAGE_NAME image to $BUILD_NUMBER" || echo "No changes to commit"
+
+                        git remote set-url origin "https://github.com/Ahmedhessn/K8s-CD-files.git"
+                        GIT_ASKPASS="$ASKPASS_PATH" GIT_TERMINAL_PROMPT=0 git push origin HEAD:main
+                    '''
                 }
             }
         }
