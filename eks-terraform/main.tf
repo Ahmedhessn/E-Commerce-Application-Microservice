@@ -147,13 +147,14 @@ resource "aws_eks_node_group" "node-grp" {
   node_role_arn   = aws_iam_role.worker.arn
   subnet_ids      = [data.aws_subnet.subnet-1.id, data.aws_subnet.subnet-2.id]
   
-  capacity_type   = "SPOT"
-  disk_size       = 20
-  instance_types  = ["t3.medium"]
+  capacity_type = "SPOT"
+  disk_size     = 20
+  # t3.large: max pods/node أعلى من t3.medium؛ t3.medium احتياطي لـ Spot.
+  instance_types = ["t3.large", "t3.medium"]
 
   scaling_config {
-    desired_size = 2
-    max_size     = 5
+    desired_size = 3
+    max_size     = 6
     min_size     = 1
   }
 
